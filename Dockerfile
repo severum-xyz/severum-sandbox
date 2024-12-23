@@ -12,4 +12,6 @@ ENV PATH="/root/.foundry/bin:$PATH"
 RUN curl -L https://foundry.paradigm.xyz | bash && \
     /root/.foundry/bin/foundryup
 
-CMD ["/bin/bash"]
+EXPOSE 8545
+
+CMD ["anvil"]
