@@ -48,6 +48,18 @@ docker build -t severum-sandbox .
 docker run -it severum-sandbox
 ```
 
+**Note**: The CI pipeline will be triggered when you push changes or open a pull request. When running tests inside the Docker container, the following steps are automatically performed:
+
+The "Reentrancy" challenge is downloaded from the private repository.
+The "ReentrancyExploit" contract (the solution) is downloaded.
+The Reentrancy contract is deployed and interacted with.
+The solution contract (ReentrancyExploit) is deployed and executed.
+Tests are executed to verify if the challenge has been solved correctly.
+
+
+(Maybe change this part idk, the sandbox will download the simple reeantrancy challenge from the private repository)
+Then we test it out and the result is in the actions :
+
 ### Contributing
 We welcome contributions to improve `severum-sandbox`. If you'd like to contribute:
 1. Fork and clone the repository.
