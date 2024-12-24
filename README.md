@@ -62,6 +62,10 @@ We welcome contributions to improve `severum-sandbox`. If you'd like to contribu
 2. Submit pull requests with clear descriptions of your changes.
 3. Focus on enhancing the sandbox for platform integration and challenge support.
 
+### License
+
+Severum Core is open for contributions under the [MIT License](LICENSE).
+
 ## Contact
 
 For questions or feedback, please reach out to the Severum team at **contact@severum.xyz**.
