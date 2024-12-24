@@ -35,9 +35,9 @@ jobs:
           cd ~/sandbox/reentrancy-1 && \
           forge init . --no-git && \
           rm -rf src/* test/* script/* && \
-          cp /tmp/severum-challenges/reentrancy/challenges/1/Reentrancy.sol src/ && \
-          cp /tmp/severum-challenges/reentrancy/solutions/1/ReentrancyExploit.sol src/ && \
-          cp /tmp/severum-challenges/reentrancy/tests/1/ReentrancyTest.t.sol test/"
+          cp /tmp/severum-challenges/reentrancy/1/challenge/Reentrancy.sol src/ && \
+          cp /tmp/severum-challenges/reentrancy/1/solution/ReentrancyExploit.sol src/ && \
+          cp /tmp/severum-challenges/reentrancy/1/test/ReentrancyTest.t.sol test/"
 
         
         PRIVATE_KEY="0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"  # Fixed private key for Account 0 in Anvil
