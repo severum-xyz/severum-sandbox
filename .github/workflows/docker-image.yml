@@ -2,17 +2,81 @@ name: Docker Image CI
 
 on:
   push:
-    branches: [ "master" ]
+    branches:
+      - 'master'
   pull_request:
-    branches: [ "master" ]
+    branches:
+      - 'master'
 
 jobs:
-
   build:
 
     runs-on: ubuntu-latest
 
     steps:
     - uses: actions/checkout@v4
+
+    - name: Clone private severum-challenges repository
+      run: |
+        git clone https://$GITHUB_ACTOR:${{ secrets.SEVERUM_CHALLENGES }}@github.com/severum-xyz/severum-challenges.git /tmp/severum-challenges
+      env:
+        SEVERUM_CHALLENGES: ${{ secrets.SEVERUM_CHALLENGES }}
+
     - name: Build the Docker image
-      run: docker build . --file Dockerfile --tag my-image-name:$(date +%s)
+      run: docker build . --file Dockerfile --tag severum-sandbox:${{ github.sha }}
+
+    - name: Run tests inside Docker container
+      run: |
+        # Run the container in the background and mount the directory
+        docker run -d --name severum-sandbox-container -v ~/reentrancy-1:/home/sandbox/reentrancy-1 -v /tmp/severum-challenges:/tmp/severum-challenges severum-sandbox:${{ github.sha }}
+   
+        docker exec severum-sandbox-container bash -c "
+          mkdir -p ~/sandbox/reentrancy-1 && \
+          cd ~/sandbox/reentrancy-1 && \
+          forge init . --no-git && \
+          rm -rf src/* test/* script/* && \
+          cp /tmp/severum-challenges/reentrancy/challenges/1/Reentrancy.sol src/ && \
+          cp /tmp/severum-challenges/reentrancy/solutions/1/ReentrancyExploit.sol src/ && \
+          cp /tmp/severum-challenges/reentrancy/tests/1/ReentrancyTest.t.sol test/"
+
+        
+        PRIVATE_KEY="0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"  # Fixed private key for Account 0 in Anvil
+        echo "PRIVATE_KEY=$PRIVATE_KEY" >> $GITHUB_ENV
+
+        # 1. Deploy the Reentrancy contract (victim contract) on Anvil
+        echo "Deploying Reentrancy contract..."
+        REENTRANCY_CONTRACT_OUTPUT=$(docker exec severum-sandbox-container bash -c "forge create ~/sandbox/reentrancy-1/src/Reentrancy.sol:Reentrancy --rpc-url http://localhost:8545 --private-key $PRIVATE_KEY --broadcast")
+
+        REENTRANCY_CONTRACT_ADDRESS=$(echo "$REENTRANCY_CONTRACT_OUTPUT" | grep -oP '(?<=Deployed to: )0x[a-fA-F0-9]{40}')
+
+        # 2. Deploy the ReentrancyExploit contract (attacker contract) on Anvil with the Reentrancy contract address
+        echo "Deploying ReentrancyExploit contract..."
+        EXPLOIT_CONTRACT_OUTPUT=$(docker exec severum-sandbox-container bash -c "forge create ~/sandbox/reentrancy-1/src/ReentrancyExploit.sol:ReentrancyExploit --rpc-url http://localhost:8545 --private-key $PRIVATE_KEY --broadcast --constructor-args $REENTRANCY_CONTRACT_ADDRESS")
+
+        EXPLOIT_CONTRACT_ADDRESS=$(echo "$EXPLOIT_CONTRACT_OUTPUT" | grep -oP '(?<=Deployed to: )0x[a-fA-F0-9]{40}')
+
+        # 3. Deposit funds into the Reentrancy contract
+        echo "Depositing funds into Reentrancy contract..."
+        docker exec severum-sandbox-container bash -c "cast send $REENTRANCY_CONTRACT_ADDRESS \"deposit()\" --rpc-url http://localhost:8545 --private-key $PRIVATE_KEY --value 20ether --gas-limit 2000000"
+
+        echo "Checking the balance of the Reentrancy contract..."
+        docker exec severum-sandbox-container bash -c "cast balance $REENTRANCY_CONTRACT_ADDRESS --rpc-url http://localhost:8545"
+
+        # 4. Execute the exploit using the exploit contract's address
+        echo "Executing exploit..."
+        docker exec severum-sandbox-container bash -c "cast send $EXPLOIT_CONTRACT_ADDRESS \"attack()\" --value 5ether --rpc-url http://localhost:8545 --private-key $PRIVATE_KEY --gas-limit 2000000"
+
+        echo "Checking the balance of the Reentrancy contract after the exploit..."
+        docker exec severum-sandbox-container bash -c "cast balance $REENTRANCY_CONTRACT_ADDRESS --rpc-url http://localhost:8545"
+
+        echo "Checking the balance of the Exploit contract after the exploit..."
+        docker exec severum-sandbox-container bash -c "cast balance $EXPLOIT_CONTRACT_ADDRESS --rpc-url http://localhost:8545"
+
+        # 5. Check if the exploit was successful
+        echo "Checking if the exploit was successful..."
+        docker exec severum-sandbox-container bash -c "cd ~/sandbox/reentrancy-1 && forge test"
+
+        # Stop and remove the container after the  tests
+        docker stop severum-sandbox-container
+        docker rm severum-sandbox-container 
+ 
